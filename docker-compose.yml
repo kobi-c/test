@@ -1,0 +1,73 @@
+version: '3.3'
+
+services:
+  elasticsearch:
+    container_name: elasticsearch
+    environment:
+      http.host: 0.0.0.0
+      transport.host: 127.0.0.1
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.2.0
+    networks:
+      elk: null
+    ports:
+    - "9200:9200"
+    - "9300:9300"
+    restart: unless-stopped
+    environment:
+      LS_JAVA_OPTS: "-Xmx256m -Xms256m"
+    volumes:
+    - ./elasticsearch/data:/usr/share/elasticsearch/data:rw
+
+  logstash:
+    container_name: logstash
+    image: docker.elastic.co/logstash/logstash:7.2.0
+    depends_on:
+    - elasticsearch
+    networks:
+      elk: null
+    ports:
+    - "5044:5044"
+    restart: unless-stopped
+    environment:
+      LS_JAVA_OPTS: "-Xmx256m -Xms256m"
+    volumes:
+    - ./logstash/pipeline:/usr/share/logstash/pipeline:ro
+
+  kibana:
+    container_name: kibana
+    depends_on:
+    - elasticsearch
+    environment:
+      ELASTICSEARCH_PASSWORD: changeme
+      ELASTICSEARCH_URL: http://elasticsearch:9200
+      ELASTICSEARCH_USERNAME: elastic
+      LS_JAVA_OPTS: "-Xmx256m -Xms256m"
+    image: docker.elastic.co/kibana/kibana:7.2.0
+    networks:
+      elk: null
+    ports:
+    - 5601:5601
+  
+  filebeat:
+    container_name: filebeat
+    image: docker.elastic.co/beats/filebeat:7.2.0
+    user: root
+    networks:
+      elk: null
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /var/lib/docker/containers:/var/lib/docker/containers/:ro
+      - ./filebeat/filebeat.docker.yml:/usr/share/filebeat/filebeat.yml:ro
+    environment:
+      - KIBANA_HOST=kibana
+      - ELASTICSEARCH_USERNAME=elastic
+      - ELASTICSEARCH_PASSWORD=changeme
+
+  # test_node:
+  #   container_name: test_node
+  #   image: bitnami/node-example:0.0.1
+  #   ports:
+  #   - 3000:3000
+
+networks:
+  elk:
